@@ -1,64 +1,173 @@
 <?php
 // --- 1. ส่วนเชื่อมต่อฐานข้อมูล ---
 $servername = "localhost";
-$username = "root"; // <-- User เริ่มต้นของ XAMPP
-$password = "";     // <-- รหัสผ่านเริ่มต้นของ XAMPP (คือว่างเปล่า)
-$dbname = "doc_system"; // <-- ชื่อฐานข้อมูลที่คุณสร้าง
-$table_name = "combined_data"; // <-- ชื่อตารางที่ phpMyAdmin สร้าง
+$username = "root";
+$password = "";
+$dbname = "doc_system";
+$table_name = "Combined_Data";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// --- 2. ส่วนประมวลผลการค้นหา ---
-$search_results = [];
-$search_query = "";
+// --- ดึงข้อมูล 'role' มาเตรียมไว้สำหรับ Dropdown ---
+$roles_list = [];
+$sql_roles = "SELECT role_id, role_name FROM role ORDER BY role_id";
+$result_roles = $conn->query($sql_roles);
+if ($result_roles->num_rows > 0) {
+    while ($row = $result_roles->fetch_assoc()) {
+        $roles_list[] = $row;
+    }
+}
 
-if (isset($_GET['query']) && !empty($_GET['query'])) {
-    $search_query = $_GET['query'];
-    
-    // ป้องกัน SQL Injection
-    $query_safe = "%" . $conn->real_escape_string($search_query) . "%"; 
-    
-    // ค้นหาจาก 3 คอลัมน์ (pid, fname, lname) - *แก้ชื่อคอลัมน์ให้ตรงกับของคุณ*
-    $sql = "SELECT * FROM $table_name 
-            WHERE pid LIKE ? OR fname LIKE ? OR lname LIKE ?";
-            
+// *** แก้ไข ***
+// --- 2. ส่วนประมวลผลการค้นหา (รับ 4 ค่าแยกกัน) ---
+$search_results = [];
+// รับค่าจากฟอร์มทั้ง 4 ช่อง
+$pid_query = $_POST['pid_query'] ?? '';
+$fname_query = $_POST['fname_query'] ?? '';
+$lname_query = $_POST['lname_query'] ?? '';
+$selected_role = $_POST['role_filter'] ?? '';
+
+// ตรวจสอบว่ามีการค้นหา (ไม่ว่างเปล่า) อย่างน้อย 1 ช่องหรือไม่
+$search_active = !empty($pid_query) || !empty($fname_query) || !empty($lname_query) || !empty($selected_role);
+
+if ($search_active) {
+
+    $sql = "SELECT * FROM $table_name";
+    $where_clauses = [];
+    $params_types = "";
+    $params_values = [];
+
+    // --- สร้างเงื่อนไข SQL แบบไดนามิก ---
+
+    // เงื่อนไขที่ 1: ค้นหา PID
+    if (!empty($pid_query)) {
+        // !! แก้ 'pid' ให้ตรงกับชื่อคอลัมน์ของคุณ !!
+        $where_clauses[] = "pid LIKE ?";
+        $params_types .= "s";
+        $params_values[] = "%" . $conn->real_escape_string($pid_query) . "%";
+    }
+
+    // เงื่อนไขที่ 2: ค้นหา Fname
+    if (!empty($fname_query)) {
+        // !! แก้ 'fname' ให้ตรงกับชื่อคอลัมน์ของคุณ !!
+        $where_clauses[] = "fname LIKE ?";
+        $params_types .= "s";
+        $params_values[] = "%" . $conn->real_escape_string($fname_query) . "%";
+    }
+
+    // เงื่อนไขที่ 3: ค้นหา Lname
+    if (!empty($lname_query)) {
+        // !! แก้ 'lname' ให้ตรงกับชื่อคอลัมน์ของคุณ !!
+        $where_clauses[] = "lname LIKE ?";
+        $params_types .= "s";
+        $params_values[] = "%" . $conn->real_escape_string($lname_query) . "%";
+    }
+
+    // เงื่อนไขที่ 4: ค้นหา Role
+    if (!empty($selected_role)) {
+        $where_clauses[] = "role_id = ?";
+        $params_types .= "i"; // 'i' หมายถึง Integer
+        $params_values[] = $selected_role;
+    }
+
+    // รวมเงื่อนไขทั้งหมดด้วย "AND"
+    $sql .= " WHERE " . implode(" AND ", $where_clauses);
+
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sss", $query_safe, $query_safe, $query_safe);
+
+    if ($stmt === false) {
+        // นี่คือการดักจับ Error (เช่น ถ้าคุณใส่ชื่อคอลัมน์ผิด)
+        die("SQL Error: " . $conn->error . "<br>Full SQL: " . $sql);
+    }
+
+    // ...$params_values คือการส่ง Array เข้าไปใน bind_param
+    $stmt->bind_param($params_types, ...$params_values);
     $stmt->execute();
-    
+
     $result = $stmt->get_result();
     if ($result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
+        while ($row = $result->fetch_assoc()) {
             $search_results[] = $row;
         }
     }
     $stmt->close();
 }
 $conn->close();
+
+// --- ฟังก์ชันสำหรับไฮไลท์ (ไม่เปลี่ยนแปลง) ---
+function highlightText($text, $query)
+{
+    if (empty($query)) {
+        return htmlspecialchars($text);
+    }
+    $safe_text = htmlspecialchars($text);
+    $safe_query = htmlspecialchars($query);
+    return str_ireplace($safe_query, "<mark>{$safe_query}</mark>", $safe_text);
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบค้นหาเอกสาร</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
+
 <body>
 
     <div class="container mt-5">
         <h1 class="text-center">🔍 ระบบค้นหาเอกสาร</h1>
 
-        <form action="index.php" method="GET" class="mb-4">
-            <div class="input-group">
-                <input type="text" class="form-control" 
-                       placeholder="ค้นหาจาก PID, ชื่อ (fname), หรือ นามสกุล (lname)..." 
-                       name="query" value="<?php echo htmlspecialchars($search_query); ?>">
-                <button class="btn btn-primary" type="submit">ค้นหา</button>
+        <form action="index.php" method="POST" class="mb-4">
+
+            <div class="row g-3">
+
+                <div class="col-md-3">
+                    <input type="text" class="form-control"
+                        placeholder="ค้นหา PID"
+                        name="pid_query" value="<?php echo htmlspecialchars($pid_query); ?>">
+                </div>
+
+                <div class="col-md-3">
+                    <input type="text" class="form-control"
+                        placeholder="ค้นหาชื่อ (fname)"
+                        name="fname_query" value="<?php echo htmlspecialchars($fname_query); ?>">
+                </div>
+
+                <div class="col-md-3">
+                    <input type="text" class="form-control"
+                        placeholder="ค้นหานามสกุล (lname)"
+                        name="lname_query" value="<?php echo htmlspecialchars($lname_query); ?>">
+                </div>
+
+                <div class="col-md-3">
+                    <select class="form-select" name="role_filter">
+                        <option value="">[ เลือกตำแหน่งทั้งหมด ]</option>
+                        <?php foreach ($roles_list as $role): ?>
+                            <option value="<?php echo $role['role_id']; ?>"
+                                <?php if ($selected_role == $role['role_id']) echo 'selected'; ?>>
+                                <?php echo htmlspecialchars($role['role_name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-6"> <button class="btn btn-primary w-100" type="submit">
+                        🔍 ค้นหา
+                    </button>
+                </div>
+                <div class="col-6"> <a href="index.php" class="btn btn-outline-secondary w-100">
+                        ❌ ล้างค่า
+                    </a>
+                </div>
             </div>
         </form>
 
@@ -67,35 +176,67 @@ $conn->close();
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>PID</th>
+                        <th>เลขประจำตัวประชาชน</th>
+                        <th>คำนำหน้า</th>
                         <th>ชื่อ (fname)</th>
                         <th>นามสกุล (lname)</th>
-                        <th>ชื่อไฟล์เก่า (oldname)</th>
+                        <th>ตำแหน่ง</th>
                         <th>ดาวน์โหลด</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($search_results as $row): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($row['pid']); ?></td>
-                            <td><?php echo htmlspecialchars($row['fname']); ?></td>
-                            <td><?php echo htmlspecialchars($row['lname']); ?></td>
-                            <td><?php echo htmlspecialchars($row['oldname']); ?></td>
+                            <td><?php echo highlightText($row['pid'], $pid_query); ?></td>
+                            <td><?php echo highlightText($row['perfix'], $pid_query); ?></td>
+                            <td><?php echo highlightText($row['fname'], $fname_query); ?></td>
+                            <td><?php echo highlightText($row['lname'], $lname_query); ?></td>
                             <td>
-                                <a href="download.php?pid=<?php echo htmlspecialchars($row['pid']); ?>" 
-                                   class="btn btn-success btn-sm" target="_blank">
-                                   ดาวน์โหลด PDF
-                                </a>
+                                <?php
+                                if ($row['role_id'] == 1) {
+                                    echo 'ข้าราชการ';
+                                } elseif ($row['role_id'] == 2) {
+                                    echo 'ลูกจ้างประจำ';
+                                } else {
+                                    echo 'N/A';
+                                }
+                                ?>
+                            </td>
+
+                            <td>
+                                <?php
+                                $file_to_check = __DIR__ . "/pdf_storage/" . $row['pid'] . ".pdf";
+                                if (file_exists($file_to_check)):
+                                ?>
+                                    <a href="download.php?pid=<?php echo htmlspecialchars($row['pid']); ?>"
+                                        class="btn btn-success btn-sm" target="_blank">
+                                        ดาวน์โหลด PDF
+                                    </a>
+                                <?php
+                                else:
+                                ?>
+                                    <button class="btn btn-secondary btn-sm" disabled>
+                                        ไม่พบไฟล์
+                                    </button>
+                                <?php
+                                endif;
+                                ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-        <?php elseif (isset($_GET['query'])): ?>
-            <p class="alert alert-warning">ไม่พบข้อมูลที่ตรงกับ "<?php echo htmlspecialchars($search_query); ?>"</p>
+
+        <?php
+        // *** แก้ไข *** (เงื่อนไข "ไม่พบข้อมูล")
+        // ถ้า $search_active เป็น true (มีการค้นหา) แต่ $search_results ว่างเปล่า
+        elseif ($search_active):
+        ?>
+            <p class="alert alert-warning">ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่ค้นหา</p>
         <?php endif; ?>
 
     </div>
 
 </body>
+
 </html>
