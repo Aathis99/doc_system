@@ -45,9 +45,9 @@ if ($search_active) {
     // เงื่อนไขที่ 1: ค้นหา PID
     if (!empty($pid_query)) {
         // !! แก้ 'pid' ให้ตรงกับชื่อคอลัมน์ของคุณ !!
-        $where_clauses[] = "pid LIKE ?";
+        $where_clauses[] = "pid = ?";
         $params_types .= "s";
-        $params_values[] = "%" . $conn->real_escape_string($pid_query) . "%";
+        $params_values[] = $pid_query;
     }
 
     // เงื่อนไขที่ 2: ค้นหา Fname
@@ -117,6 +117,7 @@ function highlightText($text, $query)
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบค้นหาเอกสาร</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -124,29 +125,28 @@ function highlightText($text, $query)
     <div class="container mt-5">
         <h1 class="text-center">🔍 ระบบค้นหาเอกสาร</h1>
 
-        <form action="index.php" method="POST" class="mb-4">
+        <form action="index.php" method="POST" class="mb-4" id="searchForm">
 
             <div class="row g-3">
 
-                <div class="col-md-3">
-                    <input type="text" class="form-control"
-                        placeholder="ค้นหา PID"
-                        name="pid_query" value="<?php echo htmlspecialchars($pid_query); ?>">
+                <div class="col-md-12">
+                    <input type="text" class="form-control" placeholder="ค้นหาด้วย เลขประจำตัวประชาชน (13 หลัก)" name="pid_query"
+                        id="pid_input" value="<?php echo htmlspecialchars($pid_query); ?>" maxlength="13">
                 </div>
 
-                <div class="col-md-3">
+                <!-- <div class="col-md-3">
                     <input type="text" class="form-control"
                         placeholder="ค้นหาชื่อ (fname)"
                         name="fname_query" value="<?php echo htmlspecialchars($fname_query); ?>">
-                </div>
+                </div> -->
 
-                <div class="col-md-3">
+                <!-- <div class="col-md-3">
                     <input type="text" class="form-control"
                         placeholder="ค้นหานามสกุล (lname)"
                         name="lname_query" value="<?php echo htmlspecialchars($lname_query); ?>">
-                </div>
+                </div> -->
 
-                <div class="col-md-3">
+                <!-- <div class="col-md-3">
                     <select class="form-select" name="role_filter">
                         <option value="">[ เลือกตำแหน่งทั้งหมด ]</option>
                         <?php foreach ($roles_list as $role): ?>
@@ -156,7 +156,7 @@ function highlightText($text, $query)
                             </option>
                         <?php endforeach; ?>
                     </select>
-                </div>
+                </div> -->
             </div>
 
             <div class="row mt-3">
@@ -176,7 +176,7 @@ function highlightText($text, $query)
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>เลขประจำตัวประชาชน</th>
+                        <!-- <th>เลขประจำตัวประชาชน</th> -->
                         <th>คำนำหน้า</th>
                         <th>ชื่อ (fname)</th>
                         <th>นามสกุล (lname)</th>
@@ -187,8 +187,8 @@ function highlightText($text, $query)
                 <tbody>
                     <?php foreach ($search_results as $row): ?>
                         <tr>
-                            <td><?php echo highlightText($row['pid'], $pid_query); ?></td>
-                            <td><?php echo highlightText($row['perfix'], $pid_query); ?></td>
+                            <!-- <td><?php echo highlightText($row['pid'], $pid_query); ?></td> -->
+                            <td><?php echo htmlspecialchars($row['perfix']); ?></td>
                             <td><?php echo highlightText($row['fname'], $fname_query); ?></td>
                             <td><?php echo highlightText($row['lname'], $lname_query); ?></td>
                             <td>
@@ -208,9 +208,9 @@ function highlightText($text, $query)
                                 $file_to_check = __DIR__ . "/pdf_storage/" . $row['pid'] . ".pdf";
                                 if (file_exists($file_to_check)):
                                 ?>
-                                    <a href="download.php?pid=<?php echo htmlspecialchars($row['pid']); ?>"
+                                    <a href="preview.php?pid=<?php echo htmlspecialchars($row['pid']); ?>"
                                         class="btn btn-success btn-sm" target="_blank">
-                                        ดาวน์โหลด PDF
+                                        ดูไฟล์ PDF
                                     </a>
                                 <?php
                                 else:
@@ -237,6 +237,49 @@ function highlightText($text, $query)
 
     </div>
 
+    <script>
+        // ดักจับการ submit ของฟอร์มที่มี id="searchForm"
+        document.getElementById('searchForm').addEventListener('submit', function (event) {
+            // ดึงค่าจากช่อง input ที่มี id="pid_input"
+            const pidInput = document.getElementById('pid_input');
+            const pidValue = pidInput.value.trim();
+
+            // 1. ตรวจสอบว่าใส่ข้อมูลหรือไม่
+            if (pidValue === '') {
+                event.preventDefault(); // หยุดการส่งฟอร์ม
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรุณาใส่ข้อมูล',
+                    text: 'กรุณากรอกเลขประจำตัวประชาชนเพื่อทำการค้นหา',
+                });
+                return; // หยุดการทำงานฟังก์ชัน
+            }
+
+            // 2. ตรวจสอบว่าเป็นตัวเลขทั้งหมดหรือไม่ (Regular Expression)
+            if (!/^\d+$/.test(pidValue)) {
+                event.preventDefault(); // หยุดการส่งฟอร์ม
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อมูลไม่ถูกต้อง',
+                    text: 'กรุณากรอกเป็นตัวเลขเท่านั้น',
+                });
+                return;
+            }
+
+            // 3. ตรวจสอบว่ามี 13 หลักหรือไม่
+            if (pidValue.length !== 13) {
+                event.preventDefault(); // หยุดการส่งฟอร์ม
+                Swal.fire({
+                    icon: 'error',
+                    title: 'จำนวนหลักไม่ถูกต้อง',
+                    text: 'เลขประจำตัวประชาชนต้องมี 13 หลักเท่านั้น',
+                });
+                return;
+            }
+
+            // ถ้าผ่านทุกเงื่อนไข ฟอร์มจะถูกส่งไปตามปกติ
+        });
+    </script>
 </body>
 
 </html>
