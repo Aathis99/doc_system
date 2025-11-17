@@ -135,14 +135,14 @@ function highlightText($text, $query)
             z-index: -1; /* ส่งไปไว้ด้านหลังสุด */
 
             /* --- ส่วนสำหรับภาพพื้นหลัง --- */
-            background-image: url('images/bg1.png');
+            background-image: url('images/bg5.jpg');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             
             /* --- ส่วนที่คุณสามารถปรับความโปร่งใสได้ --- */
             /* ปรับค่า opacity: 1.0 (ทึบ) ถึง 0.0 (โปร่งใส) */
-            opacity: 0.8; 
+            opacity: 0.7; 
         }
         .banner-placeholder {
             width: 100%;
