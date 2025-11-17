@@ -118,12 +118,67 @@ function highlightText($text, $query)
     <title>ระบบค้นหาเอกสาร</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            /* ย้ายคุณสมบัติ background-image ไปที่ ::before */
+            /* สีสำรองจะแสดงผลหาก ::before ไม่ทำงาน */
+            background-color: #D7C097;
+        }
+
+        body::before {
+            content: '';
+            position: fixed; /* ตรึงให้อยู่กับ viewport */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1; /* ส่งไปไว้ด้านหลังสุด */
+
+            /* --- ส่วนสำหรับภาพพื้นหลัง --- */
+            background-image: url('images/bg1.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            
+            /* --- ส่วนที่คุณสามารถปรับความโปร่งใสได้ --- */
+            /* ปรับค่า opacity: 1.0 (ทึบ) ถึง 0.0 (โปร่งใส) */
+            opacity: 0.8; 
+        }
+        .banner-placeholder {
+            width: 100%;
+            height: 250px; /* กำหนดความสูงคงที่ */
+            background-color: #F5F5DC; /* สีเบจ (Beige) */
+            overflow: hidden; /* ซ่อนส่วนที่ล้นออกจากกรอบ */
+        }
+        .banner-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* ทำให้รูปภาพเต็มกรอบโดยไม่เสียสัดส่วน */
+        }
+        .content-wrapper {
+            background-color: rgba(245, 245, 220, 0.95); /* สีเบจ (Beige) แบบโปร่งแสงเล็กน้อย */
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+    </style>
 </head>
 
 <body>
-
-    <div class="container mt-5">
-        <h1 class="text-center">🔍 ระบบค้นหาเอกสาร</h1>
+    <!-- เพิ่มคลาส content-wrapper ที่นี่ -->
+    <div class="container mt-4 content-wrapper">
+        <!-- ส่วนของ Banner ที่เป็น Responsive -->
+        <div class="banner-placeholder mb-4">
+            <picture>
+                <!-- 1. สำหรับจอใหญ่ (Desktop >= 992px) -->
+                <source media="(min-width: 992px)" srcset="images/banner1.jpg">
+                <!-- 2. สำหรับจอขนาดกลาง (Tablet >= 768px) -->
+                <source media="(min-width: 768px)" srcset="images/banner1.jpg">
+                <!-- 3. รูปภาพเริ่มต้นสำหรับจอมือถือและกรณีอื่นๆ (Fallback) -->
+                <img src="images/banner1.jpg" alt="Company Banner" class="banner-image">
+            </picture>
+        </div>
+        <h1 class="text-center">🔍 แบบแจ้งรายการเพื่อการหักลดหย่อนข้าราชการ</h1>
 
         <form action="index.php" method="POST" class="mb-4" id="searchForm">
 
@@ -164,7 +219,7 @@ function highlightText($text, $query)
                         🔍 ค้นหา
                     </button>
                 </div>
-                <div class="col-6"> <a href="index.php" class="btn btn-outline-secondary w-100">
+                <div class="col-6"> <a href="index.php" class="btn btn-warning btn-secondary w-100">
                         ❌ ล้างค่า
                     </a>
                 </div>
